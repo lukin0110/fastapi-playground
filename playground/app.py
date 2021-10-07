@@ -9,6 +9,8 @@ from typing import Any, Dict
 
 from fastapi import FastAPI
 
+from . import users
+
 app = FastAPI(title="Playground")
 
 
@@ -16,3 +18,6 @@ app = FastAPI(title="Playground")
 def index() -> Dict[str, Any]:
     """Hello World."""
     return {"message": "Hello World"}
+
+
+app.include_router(users.router, prefix="/users", tags=["Users"])
