@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "playground"
+version = "0.1.0"
+description = "FastAPI Playground"
+authors = ["Maarten Huijsmans <maarten.huijsmans@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "3.8.12"
+fastapi = "^0.70.0"
+uvicorn = "^0.15.0"
+pydantic = {extras = ["email"], version = "^1.8.2"}
+isort = "^5.9.3"
+mypy = "^0.910"
+black = "^21.9b0"
+flake8 = "^3.9.2"
+
+[tool.poetry.dev-dependencies]
+types-orjson = "^3.6.0"
+types-ujson = "^0.1.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+api = "playground.bootstrap:start"

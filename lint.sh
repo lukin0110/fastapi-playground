@@ -1,9 +1,9 @@
 #!/bin/bash
 echo "Run isort"
-isort .
+poetry run isort .
 echo "Run black"
-black .
+poetry run black .
 echo "Run flake8"
-flake8 .
+poetry run flake8 .
 echo "Run mypy"
-mypy .
+poetry run mypy .
