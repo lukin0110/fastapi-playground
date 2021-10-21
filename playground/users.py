@@ -1,5 +1,5 @@
 """Users."""
-from typing import Any, Dict, List
+from typing import Annotated, Any, Dict, List, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel, EmailStr, Field
@@ -8,42 +8,50 @@ from starlette.status import HTTP_404_NOT_FOUND
 
 router = APIRouter()
 
+ID = Annotated[
+    int, Field(title="User ID", description="Unique ID of the user.", example="1")
+]
+FirstName = Annotated[str, Field(title="First name", example="Jeff")]
+LastName = Annotated[Optional[str], Field(title="Last name", example="Lebowski")]
+Email = Annotated[
+    EmailStr,
+    Field(
+        default_factory=lambda: "jeff@dudeism.com",
+        title="Email of the user",
+        example="dude@dudeism.com",
+    ),
+]
 
-class UserFields:
-    """Field definitions.
 
-    Can be re-used by UserCreate, UserModel & UserView.
-    """
-
-    ID = Field(..., title="User ID")
-    FIRST_NAME = Field(..., title="First name", example="Jeff")
-    LAST_NAME = Field(..., title="Last name", example="Lebowski")
-    EMAIL = Field(..., title="Email of the user", example="dude@dudeism.com")
-
-
+#######################################################
+# Database Models
+#######################################################
 class UserModel(BaseModel):
     """Full user object"""
 
-    id: int = UserFields.ID
-    first_name: str = UserFields.FIRST_NAME
-    last_name: str = UserFields.LAST_NAME
-    email: EmailStr = UserFields.EMAIL
+    id: ID
+    first_name: FirstName
+    last_name: LastName
+    email: Email
 
 
+#######################################################
+# API Models
+#######################################################
 class UserPatch(BaseModel):
     """Create a user."""
 
-    first_name: str = UserFields.FIRST_NAME
-    surname: str = UserFields.LAST_NAME
-    email: EmailStr = UserFields.EMAIL
+    first_name: FirstName
+    surname: LastName
+    email: Email
 
 
 class UserView(BaseModel):
     """Customized view on a UserModel."""
 
-    id: int = UserFields.ID
-    first_name: str = UserFields.FIRST_NAME
-    surname: str = UserFields.LAST_NAME
+    id: ID
+    first_name: FirstName
+    surname: LastName
 
 
 users_db: Dict[int, UserModel] = {
