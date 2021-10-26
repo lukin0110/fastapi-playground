@@ -1,57 +1,96 @@
 """Users."""
-from typing import Annotated, Any, Dict, List, Optional
+import traceback
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel, EmailStr, Field
 from starlette.exceptions import HTTPException
 from starlette.status import HTTP_404_NOT_FOUND
+from typing_extensions import Annotated
+
+from .mappers import Mapper
 
 router = APIRouter()
 
-ID = Annotated[
-    int, Field(title="User ID", description="Unique ID of the user.", example="1")
-]
-FirstName = Annotated[str, Field(title="First name", example="Jeff")]
-LastName = Annotated[Optional[str], Field(title="Last name", example="Lebowski")]
-Email = Annotated[
-    EmailStr,
-    Field(
+
+class UserFields:
+    """Annotated field definitions.
+
+    Type definition + metadata.
+
+    https://docs.python.org/3/library/typing.html#typing.Annotated
+    """
+
+    _ID = Field(title="User ID", description="Unique ID of the user.", example="1")
+    _FirstName = Field(title="First name", example="Jeff")
+    _LastName = Field(title="Last name", example="Lebowski")
+    _Twitch = Field(title="Twitch Account")
+    _Email = Field(
         default_factory=lambda: "jeff@dudeism.com",
         title="Email of the user",
         example="dude@dudeism.com",
-    ),
-]
+    )
+
+    ID = Annotated[int, _ID]
+    FirstName = Annotated[str, _FirstName]
+    OptionalFirstName = Annotated[Optional[str], _FirstName]
+    LastName = Annotated[str, _LastName]
+    Twitch = Annotated["TwitchAccount", _Twitch]
+    OptionalTwitch = Annotated[Optional["TwitchAccount"], _Twitch]
+    OptionalLastName = Annotated[Optional[str], _LastName]
+    OptionalEmail = Annotated[Optional[EmailStr], _Email]
 
 
 #######################################################
 # Database Models
 #######################################################
+class TwitchAccount(BaseModel):
+    """Dummy account."""
+
+    twitch_id: Optional[str] = Field(default=None, title="Twitch ID", example="TW1234")
+    twitch_username: Optional[str] = Field(
+        default=None, title="Twitch Username", example="lukin0110"
+    )
+
+
 class UserModel(BaseModel):
     """Full user object"""
 
-    id: ID
-    first_name: FirstName
-    last_name: LastName
-    email: Email
+    id: UserFields.ID
+    first_name: UserFields.FirstName
+    last_name: UserFields.LastName
+    twitch: UserFields.OptionalTwitch
+    email: UserFields.OptionalEmail
 
 
 #######################################################
 # API Models
 #######################################################
-class UserPatch(BaseModel):
+class UserCreate(BaseModel):
     """Create a user."""
 
-    first_name: FirstName
-    surname: LastName
-    email: Email
+    first_name: UserFields.FirstName
+    surname: UserFields.LastName
+    twitch: UserFields.OptionalTwitch
+    email: UserFields.OptionalEmail
+
+
+class UserPatch(BaseModel):
+    """Patch a user."""
+
+    first_name: UserFields.OptionalFirstName
+    surname: UserFields.OptionalLastName
+    twitch: UserFields.OptionalTwitch
+    email: UserFields.OptionalEmail
 
 
 class UserView(BaseModel):
     """Customized view on a UserModel."""
 
-    id: ID
-    first_name: FirstName
-    surname: LastName
+    id: UserFields.ID
+    first_name: UserFields.FirstName
+    surname: UserFields.LastName
+    twitch: UserFields.OptionalTwitch
 
 
 users_db: Dict[int, UserModel] = {
@@ -64,58 +103,37 @@ users_db: Dict[int, UserModel] = {
 }
 
 
-class Mapper:
-    # Maps model fields to views
-    map: Dict[str, str] = {"last_name": "surname"}
+class UserMapper(Mapper[UserModel, UserView, UserCreate, UserPatch]):
+    """."""
 
-    @classmethod
-    def to_view(cls, model: UserModel) -> UserView:
-        """Transform a UserModel to a UserView."""
-        data = model.dict()
-        for model_field, view_field in cls.map.items():
-            data[view_field] = data.pop(model_field)
-        return UserView.parse_obj(data)
-
-    @classmethod
-    def to_model(cls, patch: UserPatch, **kwargs: Any) -> UserModel:
-        """Transform a UserCreate to a UserModel."""
-        data = {**kwargs, **patch.dict()}
-        for model_field, view_field in cls.map.items():
-            data[model_field] = data.pop(view_field)
-        return UserModel.parse_obj(data)
-
-    @classmethod
-    def to_dict(cls, patch: UserPatch) -> Dict[str, Any]:
-        data = patch.dict(exclude_unset=True)
-        for model_field, view_field in cls.map.items():
-            data[model_field] = data.pop(view_field)
-        return data
+    last_name = "surname"
 
 
-@router.get("/", response_model=List[UserView])
+@router.get("/", summary="List all users", response_model=List[UserView])
 def index() -> List[UserView]:
-    return [Mapper.to_view(user) for user in users_db.values()]
+    return [UserMapper.to_view(user) for user in users_db.values()]
 
 
-@router.post("/", response_model=UserView)
-def create_user(patch: UserPatch) -> UserView:
+@router.post("/", summary="Create a user", response_model=UserView)
+def create_user(create: UserCreate) -> UserView:
     user_id = max(users_db.keys() or {0}) + 1
-    users_db[user_id] = Mapper.to_model(patch, id=user_id)
-    return Mapper.to_view(users_db[user_id])
+    users_db[user_id] = UserMapper.to_model(create, id=user_id)
+    return UserMapper.to_view(users_db[user_id])
 
 
-@router.patch("/{user_id}/", response_model=UserView)
+@router.patch("/{user_id}/", summary="Update a user", response_model=UserView)
 def patch_user(user_id: int, patch: UserPatch) -> UserView:
     try:
         model = users_db[user_id]
-        data = {**model.dict(), **Mapper.to_dict(patch)}
+        data = {**model.dict(), **UserMapper.to_dict(patch)}
         updated = UserModel.parse_obj(data)
         users_db[user_id] = updated
-        return Mapper.to_view(updated)
+        return UserMapper.to_view(updated)
     except KeyError:
+        traceback.print_exc()
         raise HTTPException(HTTP_404_NOT_FOUND)
 
 
-@router.get("/full/", response_model=List[UserModel])
+@router.get("/full/", summary="List full users", response_model=List[UserModel])
 def full() -> List[UserModel]:
     return [user for user in users_db.values()]
