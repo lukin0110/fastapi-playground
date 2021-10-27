@@ -1,5 +1,5 @@
 """."""
-from typing import Any, Dict, Generic, TypeVar, get_args
+from typing import Any, Dict, Generic, TypeVar, Union, get_args
 
 from pydantic import BaseModel, parse_obj_as
 
@@ -35,16 +35,8 @@ class Mapper(Generic[ModelType, ViewType, CreateType, PatchType], metaclass=Mapp
         return parse_obj_as(cls.view_type, data)
 
     @classmethod
-    def to_model(cls, patch: CreateType, **kwargs: Any) -> ModelType:
-        """Transform a UserCreate to a UserModel."""
-        data = {**kwargs, **patch.dict()}
-        for model_field, view_field in cls.map_fields.items():
-            data[model_field] = data.pop(view_field)
-        return parse_obj_as(cls.model_type, data)
-
-    @classmethod
-    def to_dict(cls, patch: PatchType) -> Dict[str, Any]:
-        data: Dict = patch.dict(exclude_unset=True)
+    def to_dict(cls, obj: Union[CreateType, PatchType]) -> Dict[str, Any]:
+        data: Dict = obj.dict(exclude_unset=True)
         for model_field, view_field in cls.map_fields.items():
             if view_field in data:
                 data[model_field] = data.pop(view_field)
